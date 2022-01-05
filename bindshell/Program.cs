@@ -30,15 +30,10 @@ namespace bindshell
             return "";
         }
         public static int ConvertToInt(this string intstr, int fail_return = 0)
-        {            
-            try
-            {
-                return Convert.ToInt32(intstr);
-            }
-            catch (Exception)
-            {
-                return fail_return;
-            }
+        {
+            Match Numbers = Regex.Match(intstr, @"^([0-9]*)");
+            if(Numbers.Success) return Convert.ToInt32(Numbers.Groups[1]);
+            return fail_return;
         }
         public static Task CreateOutputTask(this StreamReader Input, StreamWriter nStream, CancellationToken ctoken)
         {
